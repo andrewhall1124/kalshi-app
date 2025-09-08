@@ -1,10 +1,7 @@
-from prefect import flow
+from src.flows.open_markets_flow import open_markets_flow
 
 if __name__ == "__main__":
-    flow.from_source(
-        source="https://github.com/andrewhall1124/kalshi-app.git",
-        entrypoint="src/flows/open_markets_flow.py:open_markets_flow",
-    ).deploy(
+    open_markets_flow.serve(
         name="open-markets-flow",
-        work_pool_name="my-managed-pool",
+        cron="* * * * *"
     )
