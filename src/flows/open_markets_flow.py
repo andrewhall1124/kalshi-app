@@ -1,5 +1,4 @@
 import polars as pl
-from rich import print
 from src.shared.kalshi import kalshi_client
 import datetime as dt
 import src.shared.database as db
