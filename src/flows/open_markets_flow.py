@@ -27,7 +27,7 @@ def get_open_markets() -> pl.DataFrame:
     return df
 
 @flow
-def main() -> None:
+def open_marets_flow() -> None:
     # Create table
     with open("src/flows/sql/create_markets.sql", "r") as file:
         db.execute_sql(file.read())
