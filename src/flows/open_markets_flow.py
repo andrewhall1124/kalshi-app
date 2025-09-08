@@ -3,7 +3,9 @@ from rich import print
 from src.shared.kalshi import kalshi_client
 import datetime as dt
 import src.shared.database as db
+from prefect import task, flow
 
+@task
 def get_open_markets() -> pl.DataFrame:
     series_ticker = 'KXNCAAFGAME'
     limit = 1000
@@ -24,7 +26,8 @@ def get_open_markets() -> pl.DataFrame:
 
     return df
 
-def get_open_markets_flow() -> None:
+@flow
+def main() -> None:
     # Create table
     with open("src/flows/sql/create_markets.sql", "r") as file:
         db.execute_sql(file.read())
@@ -35,7 +38,6 @@ def get_open_markets_flow() -> None:
     # Stage data
     now = int(dt.datetime.now(dt.timezone.utc).timestamp())
     stage_table = f"markets_{now}"
-
     markets.write_database(
         table_name=stage_table,
         connection=db.get_database_uri(),
@@ -48,7 +50,3 @@ def get_open_markets_flow() -> None:
 
     # Drop stage table
     db.execute_sql(f"DROP TABLE {stage_table};")
-
-
-if __name__ == '__main__':
-    get_open_markets_flow()
