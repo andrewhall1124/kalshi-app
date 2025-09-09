@@ -42,17 +42,28 @@ df = (
 
 print(df)
 
-# # Total profit
-# print(   
-#     df
-#      .select(
-#         pl.col('yes_ask_close').sum(),
-#         pl.col('profit').sum()
-#     )
-#     .with_columns(
-#         pl.col('profit').truediv('yes_ask_close').mul(100).alias('return')
-#     )   
-# )
+print(
+    df
+    .select(
+        pl.col('yes_ask_close'),
+        pl.col('profit'),
+        pl.col('profit').truediv('yes_ask_close').mul(100).alias('return')
+    )
+    .select('return')
+    .describe()
+)
+
+# Total profit
+print(   
+    df
+     .select(
+        pl.col('yes_ask_close').sum(),
+        pl.col('profit').sum()
+    )
+    .with_columns(
+        pl.col('profit').truediv('yes_ask_close').mul(100).alias('return')
+    )   
+)
 
 # Total profit by day
 profits = (   
@@ -93,4 +104,4 @@ plt.title(f'Sharpe: {sharpe:.2f}')
 plt.xlabel('Day')
 plt.ylabel('Cumulative Product Return (%)')
 
-plt.show()
+# plt.show()
