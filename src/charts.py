@@ -22,7 +22,7 @@ print(df)
 
 all_tickers = df['ticker'].unique().sort().to_list()
 
-n_plots = int(len(all_tickers) / 20)
+n_plots = 18
 for i in range(n_plots):
     start_idx = i * 20
     end_idx = (i + 1) * 20
