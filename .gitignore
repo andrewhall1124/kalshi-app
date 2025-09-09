@@ -14,3 +14,6 @@ wheels/
 
 # Private key
 *.pem
+
+# Old files
+/.archive

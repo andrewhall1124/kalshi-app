@@ -1,9 +1,7 @@
 import os
 from dotenv import load_dotenv
 import datetime as dt
-from urllib.parse import urlencode
 import requests
-from rich import print
 import polars as pl
 
 load_dotenv(override=True)
@@ -19,99 +17,118 @@ class KalshiClient:
 
     def get_markets(
         self,
-        series_ticker: str | None = None,
         event_ticker: str | None = None,
+        series_ticker: str | None = None,
         max_close_ts: dt.datetime | None = None,
         min_close_ts: dt.datetime | None = None,
+        status: str | None = None,  # settled = closed, open = active
+        tickers: list[str] | None = None,
     ) -> pl.DataFrame:
-        if min_close_ts is not None:
-            min_close_ts = int(min_close_ts.timestamp())
-        
-        if max_close_ts is not None:
-            max_close_ts = int(max_close_ts.timestamp())
-
         endpoint = "markets/"
-        
-        params = {}
-        params['limit'] = 1000
-        if series_ticker is not None:
-            params['series_ticker'] = series_ticker
-        if event_ticker is not None:
-            params['event_ticker'] = event_ticker
-        if min_close_ts is not None:
-            params['min_close_ts'] = min_close_ts
-        if max_close_ts is not None:
-            params['max_close_ts'] = max_close_ts
-        
-        url = BASE_URL + endpoint
-        if params:
-            url += "?" + urlencode(params)
 
-        response = requests.get(url, params)
+        params = {"limit": 1000}
+
+        if event_ticker is not None:
+            params["event_ticker"] = event_ticker
+        if series_ticker is not None:
+            params["series_ticker"] = series_ticker
+        if max_close_ts is not None:
+            params["max_close_ts"] = int(max_close_ts.timestamp())
+        if min_close_ts is not None:
+            params["min_close_ts"] = int(min_close_ts.timestamp())
+        if status is not None:
+            params["status"] = status
+        if tickers is not None:
+            params["tickers"] = tickers
+
+        url = BASE_URL + endpoint
+
+        try:
+            response = requests.get(url, params=params)
+            response.raise_for_status()
+        except requests.RequestException as e:
+            raise Exception(f"Failed to fetch markets: {e}")
 
         columns = [
-            'ticker',
-            'event_ticker',
-            # 'market_type',
-            'title',
-            # 'subtitle',
-            # 'yes_sub_title',
-            # 'no_sub_title',
-            # 'open_time',
-            # 'close_time',
-            'expected_expiration_time',
-            # 'expiration_time',
-            # 'latest_expiration_time',
-            # 'settlement_timer_seconds',
-            'status',
-            # 'response_price_units',
-            # 'notional_value',
-            # 'notional_value_dollars',
-            'yes_bid',
-            # 'yes_bid_dollars',
-            'yes_ask',
-            # 'yes_ask_dollars',
-            'no_bid',
-            # 'no_bid_dollars',
-            'no_ask',
-            # 'no_ask_dollars',
-            # 'last_price',
-            # 'last_price_dollars',
-            # 'previous_yes_bid',
-            # 'previous_yes_bid_dollars',
-            # 'previous_yes_ask',
-            # 'previous_yes_ask_dollars',
-            # 'previous_price',
-            # 'previous_price_dollars',
-            'volume',
-            # 'volume_24h',
-            # 'liquidity',
-            # 'liquidity_dollars',
-            # 'open_interest',
-            'result',
-            # 'settlement_value',
-            # 'can_close_early',
-            # 'expiration_value',
-            # 'category',
-            # 'risk_limit_cents',
-            # 'yes_topbook_liquidity_dollars',
-            # 'no_topbook_liquidity_dollars',
-            # 'strike_type',
-            # 'custom_strike',
-            # 'rules_primary',
-            # 'rules_secondary',
-            # 'early_close_condition',
-            # 'tick_size'
+            "ticker",
+            "event_ticker",
+            "title",
+            "expected_expiration_time",
+            "status",
+            "yes_bid",
+            "yes_ask",
+            "no_bid",
+            "no_ask",
+            "volume",
+            "result",
         ]
 
-        return pl.DataFrame(response.json()['markets']).select(columns)
+        df = pl.DataFrame(response.json()["markets"]).select(
+            *columns, pl.lit(series_ticker).alias("series_ticker")
+        )
+
+        return df
+
+    def get_market_candlesticks(
+        self,
+        series_ticker: str,
+        ticker: str,
+        start_ts: dt.datetime,
+        end_ts: dt.datetime,
+        period_interval: int,  # 1 = minutes
+    ) -> pl.DataFrame:
+        endpoint = f"series/{series_ticker}/markets/{ticker}/candlesticks"
+
+        params = {
+            "start_ts": int(start_ts.timestamp()),
+            "end_ts": int(end_ts.timestamp()),
+            "period_interval": period_interval,
+        }
+
+        url = BASE_URL + endpoint
+
+        try:
+            response = requests.get(url, params=params)
+            response.raise_for_status()
+        except requests.RequestException as e:
+            raise Exception(f"Failed to fetch candlesticks: {e}")
+
+        candlesticks = [
+            {
+                "end_period_ts": candlestick["end_period_ts"],
+                "yes_bid_open": candlestick["yes_bid"]["open"],
+                "yes_bid_low": candlestick["yes_bid"]["low"],
+                "yes_bid_high": candlestick["yes_bid"]["high"],
+                "yes_bid_close": candlestick["yes_bid"]["open"],
+                "yes_ask_open": candlestick["yes_ask"]["open"],
+                "yes_ask_low": candlestick["yes_ask"]["low"],
+                "yes_ask_high": candlestick["yes_ask"]["high"],
+                "yes_ask_close": candlestick["yes_ask"]["open"],
+                "volume": candlestick["volume"],
+                "open_interest": candlestick["open_interest"],
+            }
+            for candlestick in response.json()["candlesticks"]
+        ]
+
+        df = pl.DataFrame(candlesticks).with_columns(
+            pl.lit(series_ticker).alias("series_ticker"), pl.lit(ticker).alias("ticker")
+        )
+
+        return df
 
 
 def _create_kalshi_client():
     kalshi_api_key = os.getenv("KALSHI_API_KEY")
+    private_key_path = os.getenv("KALSHI_PRIVATE_KEY_PATH", "private-key.pem")
 
-    with open("private-key.pem", "r") as f:
-        private_key = f.read()
+    if not kalshi_api_key:
+        raise ValueError("KALSHI_API_KEY environment variable is required")
+
+    try:
+        with open(private_key_path, "r") as f:
+            private_key = f.read()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Private key file not found at: {private_key_path}")
 
     return KalshiClient(kalshi_api_key, private_key)
 
