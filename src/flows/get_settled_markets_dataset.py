@@ -59,11 +59,10 @@ def get_settled_markets_dataset():
             on='ticker',
             how='left'
         )
-        .with_columns(
-            pl.col('end_period_ts').dt.convert_time_zone('America/Denver')
-        )
-        .sort('end_period_ts')
+        .sort('ticker', 'end_period_ts')
     )
+
+    print(df_history)
 
     df_history.write_parquet(f'data/{today}_history.parquet')
 
