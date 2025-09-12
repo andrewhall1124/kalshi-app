@@ -104,4 +104,4 @@ plt.title(f'Sharpe: {sharpe:.2f}')
 plt.xlabel('Day')
 plt.ylabel('Cumulative Product Return (%)')
 
-# plt.show()
+plt.show()
